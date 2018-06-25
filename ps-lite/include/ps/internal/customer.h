@@ -88,7 +88,7 @@ class Customer {
   int id_;
 
   RecvHandle recv_handle_;
-  ThreadsafeQueue<Message> recv_queue_;
+  ThreadsafeQueue recv_queue_;
   std::unique_ptr<std::thread> recv_thread_;
 
   std::mutex tracker_mu_;

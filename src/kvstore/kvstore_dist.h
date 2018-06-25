@@ -229,6 +229,7 @@ class KVStoreDist : public KVStoreLocal {
               PSKV& pskv = (gradient_compression_->get_type() == CompressionType::kNone) ?
                   EncodeDefaultKey(key, size, false) :
                   EncodeCompressedKey(key, size, false);
+
 #if MKL_EXPERIMENTAL == 1
               mkl_set_tblob_eager_mode(recv_buf.data());
 #endif
@@ -415,7 +416,7 @@ class KVStoreDist : public KVStoreLocal {
     }
     gradient_compression_->Quantize(comm_buf, &small_buf, &res_buf, priority);
     auto push_to_servers =
-      [this, key, pskv, small_buf](RunContext rctx, Engine::CallbackOnComplete cb) {
+      [this, key, pskv, small_buf, priority](RunContext rctx, Engine::CallbackOnComplete cb) {
         size_t size = small_buf.shape().Size();
         real_t* data = small_buf.data().dptr<real_t>();
 #if MKL_EXPERIMENTAL == 1
@@ -425,7 +426,7 @@ class KVStoreDist : public KVStoreLocal {
         ps::SArray<real_t> vals(data, size, false);
         CHECK_NOTNULL(ps_worker_)->ZPush(
           pskv.keys, vals, pskv.lens,
-          static_cast<int>(DataHandleType::kCompressedPushPull), [cb]() { cb(); });
+          static_cast<int>(DataHandleType::kCompressedPushPull), [cb]() { cb(); }, priority);
       };
     // acquire locks on both comm_buf and small_buf so that
     // pull (which uses comm_buf) for the same key waits till push finishes
@@ -491,7 +492,7 @@ class KVStoreDist : public KVStoreLocal {
   // push row sparse gradient
   void PushRowSparse(int key, const NDArray &send_buf, int priority) {
     using namespace rowsparse;
-    auto push_to_servers = [this, key, send_buf]
+    auto push_to_servers = [this, key, send_buf, priority]
                            (RunContext rctx, Engine::CallbackOnComplete cb) {
 #if MKL_EXPERIMENTAL == 1
       mkl_set_tblob_eager_mode(send_buf.data());
@@ -512,7 +513,7 @@ class KVStoreDist : public KVStoreLocal {
       ps::SArray<real_t> vals(data, size, false);
       CHECK_NOTNULL(ps_worker_)->ZPush(pskv.keys, vals, pskv.lens,
                                        static_cast<int>(DataHandleType::kRowSparsePushPull),
-                                       [cb]() { cb(); });
+                                       [cb]() { cb(); }, priority);
     };
     Engine::Get()->PushAsync(
         push_to_servers,
@@ -529,7 +530,7 @@ class KVStoreDist : public KVStoreLocal {
   void PullRowSparse_(const int key, const NDArray& recv_buf,
                       const NDArray& indices, int priority) {
     using namespace rowsparse;
-    auto pull_from_servers = [this, key, recv_buf, indices]
+    auto pull_from_servers = [this, key, recv_buf, indices, priority]
       (RunContext rctx, Engine::CallbackOnComplete cb) {
       // allocate memory for the buffer
       size_t num_rows = indices.shape().Size();
@@ -556,7 +557,7 @@ class KVStoreDist : public KVStoreLocal {
                     indices.data().FlatTo1D<cpu, int64_t>());
       CHECK_NOTNULL(ps_worker_)->ZPull(pskv.keys, vals, &pskv.lens,
                                        static_cast<int>(DataHandleType::kRowSparsePushPull),
-                                       [vals, cb]() { delete vals; cb(); });
+                                       [vals, cb]() { delete vals; cb(); }, priority);
     };
     CHECK_NOTNULL(Engine::Get())->PushAsync(
       pull_from_servers,

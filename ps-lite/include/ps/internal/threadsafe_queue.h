@@ -8,12 +8,13 @@
 #include <condition_variable>
 #include <memory>
 #include "ps/base.h"
+#include "ps/internal/message.h"
 namespace ps {
 
 /**
  * \brief thread-safe queue allowing push and waited pop
  */
-template<typename T> class ThreadsafeQueue {
+class ThreadsafeQueue {
  public:
   ThreadsafeQueue() { }
   ~ThreadsafeQueue() { }
@@ -22,7 +23,7 @@ template<typename T> class ThreadsafeQueue {
    * \brief push an value into the end. threadsafe.
    * \param new_value the value
    */
-  void Push(T new_value) {
+  void Push(Message new_value) {
     mu_.lock();
     queue_.push(std::move(new_value));
     mu_.unlock();
@@ -33,16 +34,22 @@ template<typename T> class ThreadsafeQueue {
    * \brief wait until pop an element from the beginning, threadsafe
    * \param value the poped value
    */
-  void WaitAndPop(T* value) {
+  void WaitAndPop(Message* value) {
     std::unique_lock<std::mutex> lk(mu_);
     cond_.wait(lk, [this]{return !queue_.empty();});
-    *value = std::move(queue_.front());
+    *value = std::move(queue_.top());
     queue_.pop();
   }
 
  private:
+  class Compare {
+    public:
+        bool operator()(Message &l, Message &r) {
+            return l.meta.priority <= r.meta.priority;
+        }
+  };
   mutable std::mutex mu_;
-  std::queue<T> queue_;
+  std::priority_queue<Message, std::vector<Message>, Compare> queue_;
   std::condition_variable cond_;
 };
 

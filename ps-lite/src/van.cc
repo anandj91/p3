@@ -345,6 +345,7 @@ void Van::PackMeta(const Meta& meta, char** meta_buf, int* buf_size) {
   pb.set_push(meta.push);
   pb.set_request(meta.request);
   pb.set_simple_app(meta.simple_app);
+  pb.set_priority(meta.priority);
   for (auto d : meta.data_type) pb.add_data_type(d);
   if (!meta.control.empty()) {
     auto ctrl = pb.mutable_control();
@@ -384,6 +385,7 @@ void Van::UnpackMeta(const char* meta_buf, int buf_size, Meta* meta) {
   meta->request = pb.request();
   meta->push = pb.push();
   meta->simple_app = pb.simple_app();
+  meta->priority = pb.priority();
   meta->body = pb.body();
   meta->data_type.resize(pb.data_type_size());
   for (int i = 0; i < pb.data_type_size(); ++i) {
