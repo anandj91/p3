@@ -543,7 +543,7 @@ void KVWorker<Val>::Send(int timestamp, bool push, int cmd, const KVPairs<Val>& 
         msg.AddData(kvs.lens);
       }
     }
-    Postoffice::Get()->van()->Send(msg);
+    Postoffice::Get()->van()->Push(msg);
   }
 }
 

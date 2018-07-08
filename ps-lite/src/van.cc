@@ -115,6 +115,10 @@ void Van::Start() {
     // start heartbeat thread
     heartbeat_thread_ = std::unique_ptr<std::thread>(
       new std::thread(&Van::Heartbeat, this));
+    // start sender thread
+    sender_thread_ = std::unique_ptr<std::thread>(
+      new std::thread(&Van::Sending, this));
+
   }
 }
 
@@ -126,19 +130,36 @@ void Van::Stop() {
   SendMsg(exit);
   receiver_thread_->join();
   if (!is_scheduler_) heartbeat_thread_->join();
+  if (!is_scheduler_) sender_thread_->join();
   if (resender_) delete resender_;
 }
 
 int Van::Send(const Message& msg) {
-  mxnet::engine::SetOprStart(msg.meta.opr_stat);
-  int send_bytes = SendMsg(msg);
-  CHECK_NE(send_bytes, -1);
-  send_bytes_ += send_bytes;
-  if (resender_) resender_->AddOutgoing(msg);
-  if (Postoffice::Get()->verbose() >= 2) {
-    PS_VLOG(2) << msg.DebugString();
-  }
-  return send_bytes;
+    mxnet::engine::SetOprStart(msg.meta.opr_stat);
+    int send_bytes = SendMsg(msg);
+    CHECK_NE(send_bytes, -1);
+    send_bytes_ += send_bytes;
+    if (resender_) resender_->AddOutgoing(msg);
+    if (Postoffice::Get()->verbose() >= 2) {
+        PS_VLOG(2) << msg.DebugString();
+    }
+    return send_bytes;
+}
+
+void Van::Push(const Message& msg) {
+    send_queue_.Push(msg);
+}
+
+void Van::Sending() {
+    while (true) {
+        Message msg;
+        send_queue_.WaitAndPop(&msg);
+        Send(msg);
+		if (!msg.meta.control.empty() &&
+				msg.meta.control.cmd == Control::TERMINATE) {
+			break;
+		}
+    }
 }
 
 void Van::Receiving() {

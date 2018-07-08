@@ -13,6 +13,7 @@
 #include <ctime>
 #include "ps/base.h"
 #include "ps/internal/message.h"
+#include "ps/internal/threadsafe_queue.h"
 namespace ps {
 class Resender;
 /**
@@ -48,6 +49,7 @@ class Van {
    * \return the number of bytes sent. -1 if failed
    */
   int Send(const Message& msg);
+  void Push(const Message& msg);
   /**
    * \brief return my node
    */
@@ -109,6 +111,8 @@ class Van {
   void Receiving();
   /** thread function for heartbeat */
   void Heartbeat();
+  /** thread function for sending */
+  void Sending();
   /** whether it is ready for sending */
   std::atomic<bool> ready_{false};
   std::atomic<size_t> send_bytes_{0};
@@ -119,12 +123,15 @@ class Van {
   std::unique_ptr<std::thread> receiver_thread_;
   /** the thread for sending heartbeat */
   std::unique_ptr<std::thread> heartbeat_thread_;
+  /** the thread for sending messages */
+  std::unique_ptr<std::thread> sender_thread_;
   std::vector<int> barrier_count_;
   /** msg resender */
   Resender* resender_ = nullptr;
   int drop_rate_ = 0;
   std::atomic<int> timestamp_{0};
   DISALLOW_COPY_AND_ASSIGN(Van);
+  ThreadsafeQueue send_queue_;
 };
 }  // namespace ps
 #endif  // PS_INTERNAL_VAN_H_
