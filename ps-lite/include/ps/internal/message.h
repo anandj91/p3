@@ -8,6 +8,8 @@
 #include <string>
 #include <sstream>
 #include "ps/sarray.h"
+#define BLAH 1
+#include "../../../../src/engine/profiler.h"
 namespace ps {
 /** \brief data type */
 enum DataType {
@@ -186,6 +188,9 @@ struct Meta {
   std::vector<DataType> data_type;
   /** \brief system control message */
   Control control;
+  /* priority */
+  int priority;
+  mxnet::engine::OprExecStat *opr_stat = nullptr;
 };
 /**
  * \brief messages that communicated amaong nodes.

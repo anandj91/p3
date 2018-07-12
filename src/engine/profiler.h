@@ -25,7 +25,11 @@
 #ifndef MXNET_ENGINE_PROFILER_H_
 #define MXNET_ENGINE_PROFILER_H_
 
+#ifdef BLAH
+#include "../../dmlc-core/include/dmlc/concurrentqueue.h"
+#else
 #include <dmlc/concurrentqueue.h>
+#endif
 #include <vector>
 #include <string>
 #include <mutex>

@@ -8,6 +8,7 @@
 #include <vector>
 #include "ps/base.h"
 #include "ps/simple_app.h"
+#include "../../../src/engine/profiler.h"
 namespace ps {
 
 /**
@@ -39,6 +40,10 @@ struct KVPairs {
   SArray<Val> vals;
   /** \brief the according value lengths (could be empty) */
   SArray<int> lens;
+  /* priority */
+  int priority;
+
+  mxnet::engine::OprExecStat *opr_stat = nullptr;
 };
 
 /**
@@ -176,13 +181,17 @@ class KVWorker : public SimpleApp {
             const SArray<Val>& vals,
             const SArray<int>& lens = {},
             int cmd = 0,
-            const Callback& cb = nullptr) {
+            const Callback& cb = nullptr,
+            int priority = 0,
+            mxnet::engine::OprExecStat *opr_stat = nullptr) {
     int ts = obj_->NewRequest(kServerGroup);
     AddCallback(ts, cb);
     KVPairs<Val> kvs;
     kvs.keys = keys;
     kvs.vals = vals;
     kvs.lens = lens;
+    kvs.priority = priority;
+    kvs.opr_stat = opr_stat;
     Send(ts, true, cmd, kvs);
     return ts;
   }
@@ -199,8 +208,10 @@ class KVWorker : public SimpleApp {
             SArray<Val>* vals,
             SArray<int>* lens = nullptr,
             int cmd = 0,
-            const Callback& cb = nullptr) {
-    return Pull_(keys, vals, lens, cmd, cb);
+            const Callback& cb = nullptr,
+            int priority = 0,
+            mxnet::engine::OprExecStat *opr_stat = nullptr) {
+    return Pull_(keys, vals, lens, cmd, cb, priority, opr_stat);
   }
   using SlicedKVs = std::vector<std::pair<bool, KVPairs<Val>>>;
   /**
@@ -227,7 +238,8 @@ class KVWorker : public SimpleApp {
    */
   template <typename C, typename D>
   int Pull_(const SArray<Key>& keys, C* vals, D* lens,
-            int cmd, const Callback& cb);
+            int cmd, const Callback& cb, int priority,
+            mxnet::engine::OprExecStat *opr_stat = nullptr);
   /**
    * \brief add a callback for a request. threadsafe.
    * @param cb callback
@@ -479,6 +491,7 @@ void KVWorker<Val>::Send(int timestamp, bool push, int cmd, const KVPairs<Val>& 
     const auto& s = sliced[i];
     if (!s.first) continue;
     Message msg;
+    msg.meta.opr_stat    = kvs.opr_stat;
     msg.meta.customer_id = obj_->id();
     msg.meta.request     = true;
     msg.meta.push        = push;
@@ -543,7 +556,8 @@ void KVWorker<Val>::RunCallback(int timestamp) {
 template <typename Val>
 template <typename C, typename D>
 int KVWorker<Val>::Pull_(
-    const SArray<Key>& keys, C* vals, D* lens, int cmd, const Callback& cb) {
+    const SArray<Key>& keys, C* vals, D* lens, int cmd, const Callback& cb, int priority,
+            mxnet::engine::OprExecStat *opr_stat) {
   int ts = obj_->NewRequest(kServerGroup);
   AddCallback(ts, [this, ts, keys, vals, lens, cb]() mutable {
       mu_.lock();
@@ -599,6 +613,8 @@ int KVWorker<Val>::Pull_(
     });
 
   KVPairs<Val> kvs; kvs.keys = keys;
+  kvs.priority = priority;
+  kvs.opr_stat = opr_stat;
   Send(ts, false, cmd, kvs);
   return ts;
 }

@@ -12,6 +12,8 @@
 #include "./meta.pb.h"
 #include "./zmq_van.h"
 #include "./resender.h"
+#define BLAH 1
+#include "../../src/engine/profiler.h"
 namespace ps {
 
 // interval in second between to heartbeast signals. 0 means no heartbeat.
@@ -128,6 +130,7 @@ void Van::Stop() {
 }
 
 int Van::Send(const Message& msg) {
+  mxnet::engine::SetOprStart(msg.meta.opr_stat);
   int send_bytes = SendMsg(msg);
   CHECK_NE(send_bytes, -1);
   send_bytes_ += send_bytes;
