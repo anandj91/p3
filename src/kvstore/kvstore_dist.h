@@ -59,7 +59,7 @@ class KVStoreDist : public KVStoreLocal {
           ps::kWorkerGroup + ps::kServerGroup + ps::kScheduler);
       }
     }
-    bigarray_bound_ = dmlc::GetEnv("MXNET_KVSTORE_BIGARRAY_BOUND", 1000 * 1000);
+    bigarray_bound_ = dmlc::GetEnv("MXNET_KVSTORE_BIGARRAY_BOUND", 40 * 1000);
     log_verbose_ = dmlc::GetEnv("MXNET_KVSTORE_DIST_ROW_SPARSE_VERBOSE", false);
   }
 
@@ -584,8 +584,8 @@ class KVStoreDist : public KVStoreLocal {
       // a simple heuristic for load balance
       if (size < bigarray_bound_) {
         // send it to a single random picked server
-        int server = (key * 9973) % num_servers;
-        ps::Key ps_key = krs[server].begin() + key;
+        int server = (key * ((ps::Key) 9973)) % num_servers;
+        ps::Key ps_key = krs[server].begin() + (ps::Key)key;
         CHECK_LT(ps_key, krs[server].end());
         pskv.keys.push_back(ps_key);
         pskv.lens.push_back(size);
@@ -593,15 +593,22 @@ class KVStoreDist : public KVStoreLocal {
       } else {
         // parition it to all servers
         pskv.size = 0;
-        for (int i = 0; i < num_servers; ++i) {
-          size_t part_size =
-            static_cast<size_t>(round(static_cast<double>(size)/num_servers*(i+1))) -
-            static_cast<size_t>(round(static_cast<double>(size)/num_servers*i));
-          ps::Key ps_key = krs[i].begin() + key;
-          CHECK_LT(ps_key, krs[i].end());
-          pskv.keys.push_back(ps_key);
-          pskv.lens.push_back(part_size);
-          pskv.size += part_size;
+        int s = size;
+        int i=0;
+        while(true) {
+            ps::Key ps_key = krs[i%num_servers].begin() + (ps::Key)(key + (i/num_servers));
+            CHECK_LT(ps_key, krs[i%num_servers].end());
+            pskv.keys.push_back(ps_key);
+            if (s > bigarray_bound_) {
+                pskv.lens.push_back(bigarray_bound_);
+                pskv.size += bigarray_bound_;
+            } else {
+                pskv.lens.push_back(s);
+                pskv.size += s;
+                break;
+            }
+            s -= bigarray_bound_;
+            i++;
         }
         CHECK_EQ(static_cast<size_t>(pskv.size), size);
       }

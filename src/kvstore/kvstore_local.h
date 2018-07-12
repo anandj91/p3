@@ -82,7 +82,7 @@ class KVStoreLocal : public KVStore {
       auto &str_key = str_keys[i];
       CHECK(str_key_dict_.find(str_key) == str_key_dict_.end())
             << "duplicate init of key " << str_key;
-      auto key = next_str_key_++;
+      auto key = (next_str_key_+=100001);
       str_key_dict_[str_key] = key;
       // record reverse mapping from int to string
       reverse_str_key_dict_[key] = str_key;
