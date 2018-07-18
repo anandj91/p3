@@ -184,7 +184,7 @@ class KVStoreDistServer {
     return;
   }
 
-  inline void ApplyUpdates(const int key, MergeBuf *merged, NDArray *stored,
+  inline void ApplyUpdates(const ps::Key key, MergeBuf *merged, NDArray *stored,
                            ps::KVServer<real_t>* server) {
     if (merged->request.size() == (size_t) ps::NumWorkers()) {
       // let the main thread to execute updater_, which is necessary for python
@@ -200,11 +200,18 @@ class KVStoreDistServer {
       if (log_verbose_)  {
         LOG(INFO) << "sync response to " << merged->request.size() << " workers";
       }
+      stored->WaitToRead();
       for (const auto& req : merged->request) {
-        server->Response(req);
+        ps::KVPairs<real_t> res;
+        size_t size = stored->shape().Size();
+        real_t* data = stored->data().dptr<real_t>();
+        ps::SArray<real_t> vals(data, size, false);
+        res.keys.push_back(key);
+        res.vals = vals;
+        res.lens.push_back(size);
+        server->Response(req, res);
       }
       merged->request.clear();
-      stored->WaitToRead();
     } else {
       merged->array.WaitToRead();
     }
@@ -467,7 +474,7 @@ class KVStoreDistServer {
       CHECK_EQ(req_data.vals.size(), (size_t)req_data.lens[0]);
     }
 
-    int key = DecodeKey(req_data.keys[0]);
+    ps::Key key = req_data.keys[0];
     auto& stored = store_[key];
 
     // there used several WaitToRead, this is because \a recved's memory
@@ -483,8 +490,16 @@ class KVStoreDistServer {
         // initialization
         stored = NDArray(dshape, Context());
         CopyFromTo(recved, &stored, 0);
-        server->Response(req_meta);
+
         stored.WaitToRead();
+        ps::KVPairs<real_t> res;
+        size_t size = stored.shape().Size();
+        real_t* data = stored.data().dptr<real_t>();
+        ps::SArray<real_t> vals(data, size, false);
+        res.keys.push_back(key);
+        res.vals = vals;
+        res.lens.push_back(size);
+        server->Response(req_meta, res);
       } else if (sync_mode_) {
         // synced push
         auto& merged = merge_buf_[key];
@@ -528,14 +543,14 @@ class KVStoreDistServer {
   /**
    * \brief store_ contains the value at kvstore for each key
    */
-  std::unordered_map<int, NDArray> store_;
+  std::unordered_map<ps::Key, NDArray> store_;
 
   /**
    * \brief merge_buf_ is a buffer used if sync_mode is true. It represents
    * values from different workers being merged. The store will be updated
    * to this value when values from all workers are pushed into this buffer.
    */
-  std::unordered_map<int, MergeBuf> merge_buf_;
+  std::unordered_map<ps::Key, MergeBuf> merge_buf_;
 
   /**
    * \brief decomp_buf_ is a buffer into which compressed values are

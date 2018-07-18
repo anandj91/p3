@@ -185,7 +185,43 @@ class KVWorker : public SimpleApp {
             int priority = 0,
             mxnet::engine::OprExecStat *opr_stat = nullptr) {
     int ts = obj_->NewRequest(kServerGroup);
-    AddCallback(ts, cb);
+    AddCallback(ts, [this, ts, keys, vals, lens, cb]() mutable {
+      if (recv_kvs_.find(ts) != recv_kvs_.end()) {
+        mu_.lock();
+        auto& kvs = recv_kvs_[ts];
+        mu_.unlock();
+
+        // do check
+        CHECK_EQ(kvs.size(), (size_t)1);
+        CHECK_EQ(keys.size(), (size_t)1);
+        CHECK_EQ(lens.size(), keys.size());
+
+        auto kv = kvs[0];
+        ps::Key key = keys[0];
+        int len = lens[0];
+        CHECK_EQ(kv.keys[0], key);
+        CHECK_EQ(kv.lens[0], len);
+        CHECK_EQ(vals.size(), (size_t)len);
+        CHECK_EQ(kv.vals.size(), (size_t)len);
+
+        Val* p_vals = vals.data();
+        int *p_lens = lens.data();
+        for (const auto& s : kvs) {
+            memcpy(p_vals, s.vals.data(), s.vals.size() * sizeof(Val));
+            p_vals += s.vals.size();
+            if (p_lens) {
+                memcpy(p_lens, s.lens.data(), s.lens.size() * sizeof(int));
+                p_lens += s.lens.size();
+            }
+        }
+
+        mu_.lock();
+        recv_kvs_.erase(ts);
+        mu_.unlock();
+      }
+      if (cb) cb();
+    });
+
     KVPairs<Val> kvs;
     kvs.keys = keys;
     kvs.vals = vals;
@@ -519,7 +555,7 @@ void KVWorker<Val>::Process(const Message& msg) {
 
   // store the data for pulling
   int ts = msg.meta.timestamp;
-  if (!msg.meta.push && msg.data.size()) {
+  if (msg.data.size()) {
     CHECK_GE(msg.data.size(), (size_t)2);
     KVPairs<Val> kvs;
     kvs.keys = msg.data[0];
