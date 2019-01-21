@@ -23,37 +23,34 @@
 ######################################################################
 set -e
 
-MXNET_HOME="$HOME/mxnet/"
+MXNET_HOME="$(dirname $(realpath $(dirname $0)))"
 echo "MXNet root folder: $MXNET_HOME"
 
-echo "Installing build-essential, libatlas-base-dev, libopencv-dev, pip, graphviz ..."
+echo "Installing build-essential, libatlas-base-dev, libopencv-dev, pip3, graphviz ..."
 sudo apt-get update
-sudo apt-get install -y build-essential libatlas-base-dev libopencv-dev graphviz
+sudo apt-get install -y build-essential libatlas-base-dev libopencv-dev graphviz libopenblas-dev
+
+echo "Installing Numpy..."
+sudo apt-get install python3-numpy
+
+echo "Installing Python setuptools pip..."
+sudo apt-get install -y python3-setuptools python3-pip
+
+echo "Updating pip..."
+pip3 install -U pip
 
 echo "Building MXNet core. This can take few minutes..."
 cd "$MXNET_HOME"
 make -j$(nproc)
 
-echo "Installing Numpy..."
-sudo apt-get install python-numpy
-
-echo "Installing Python setuptools pip..."
-sudo apt-get install -y python-setuptools python-pip
-
-echo "Updating pip..."
-sudo pip install -U pip
-
 echo "Installing Python package for MXNet..."
-cd python; sudo python setup.py install
+pip3 install -e python/
 
 echo "Adding MXNet path to your ~/.bashrc file"
 echo "export PYTHONPATH=$MXNET_HOME/python:$PYTHONPATH" >> ~/.bashrc
 source ~/.bashrc
 
 echo "Install Graphviz for plotting MXNet network graph..."
-sudo pip install graphviz
-
-echo "Installing Jupyter notebook..."
-sudo pip install jupyter
+pip3 install graphviz pyyaml
 
 echo "Done! MXNet for Python installation is complete. Go ahead and explore MXNet with Python :-)"
