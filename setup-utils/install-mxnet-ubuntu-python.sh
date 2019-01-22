@@ -37,20 +37,20 @@ echo "Installing Python setuptools pip..."
 sudo apt-get install -y python3-setuptools python3-pip
 
 echo "Updating pip..."
-pip3 install -U pip
+pip install -U pip
 
 echo "Building MXNet core. This can take few minutes..."
 cd "$MXNET_HOME"
 make -j$(nproc)
 
 echo "Installing Python package for MXNet..."
-pip3 install -e python/
+pip install -e python/
 
 echo "Adding MXNet path to your ~/.bashrc file"
 echo "export PYTHONPATH=$MXNET_HOME/python:$PYTHONPATH" >> ~/.bashrc
 source ~/.bashrc
 
 echo "Install Graphviz for plotting MXNet network graph..."
-pip3 install graphviz pyyaml
+pip install graphviz pyyaml
 
 echo "Done! MXNet for Python installation is complete. Go ahead and explore MXNet with Python :-)"
