@@ -44,13 +44,13 @@ cd "$MXNET_HOME"
 make -j$(nproc)
 
 echo "Installing Python package for MXNet..."
-pip3 install -e python/
+pip3 install -e python/ --user
 
 echo "Adding MXNet path to your ~/.bashrc file"
 echo "export PYTHONPATH=$MXNET_HOME/python:$PYTHONPATH" >> ~/.bashrc
 source ~/.bashrc
 
 echo "Install Graphviz for plotting MXNet network graph..."
-pip3 install graphviz pyyaml
+pip3 install graphviz pyyaml --user
 
-echo "Done! MXNet for Python installation is complete. Go ahead and explore MXNet with Python :-)"
+echo "Done! MXNet for Python installation is complete. Go ahead and explore P3 with Python :-)"
