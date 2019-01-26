@@ -31,7 +31,7 @@ sudo apt-get update
 sudo apt-get install -y build-essential libatlas-base-dev libopencv-dev graphviz libopenblas-dev
 
 echo "Installing Numpy..."
-sudo apt-get install python3-numpy
+sudo apt-get install python3 python3-numpy
 
 echo "Installing Python setuptools pip..."
 sudo apt-get install -y python3-setuptools python3-pip
