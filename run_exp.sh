@@ -53,6 +53,8 @@ fi
 N=$(wc -l $HOSTS|awk '{print $1}')
 echo "Launching training on $N machine(s)"
 
+source env/bin/activate
+
 case $MODEL in
 resnet)
     DMLC_INTERFACE=$IFACE python3 tools/launch.py -n ${N} -H $HOSTS python3 example/image-classification/train_imagenet.py --gpus 0 --network resnet --num-layers 50 --batch-size $BATCH --image-shape 3,224,224 --num-epochs 1 --kv-store dist_device_sync --data-train imagenet1k_val.rec
