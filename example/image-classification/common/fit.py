@@ -202,9 +202,9 @@ def fit(args, network, data_loader, **kwargs):
     mx.profiler.profiler_set_config(mode='all', filename=logfile)
     def callback():
         def switch_profiler(param):
-            if param.epoch == 0 and param.nbatch == 100:
+            if param.epoch == 0 and param.nbatch == 20:
                 profiler.profiler_set_state('run')
-            if param.epoch == 0 and param.nbatch == 110:
+            if param.epoch == 0 and param.nbatch == 30:
                 profiler.profiler_set_state('stop')
                 profiler.dump_profile()
 
